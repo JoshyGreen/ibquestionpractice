@@ -72,16 +72,15 @@ def update_progress(subject, question_id, status, user_id):
     print(f"[DEBUG] update_progress called with " + f"question_id={question_id}, subject={subject}, status={status}, user_id={user_id}")
     conn = connect_game_db()
     cursor = conn.cursor()
-    print("updating question" + str(question_id))
     
     if status == "correct":
-        print("[DEBUG] Marking question as correct in user_progress...")
+    
         if subject == "Chemistry":
             cursor.execute("""
                 INSERT INTO user_progress_chemistry (
                     question_id,
                     user_id,
-                    lacking_context,
+                    correct_count,
                     reviewed,
                     updated_at
                 )
@@ -89,8 +88,7 @@ def update_progress(subject, question_id, status, user_id):
                 ON CONFLICT(question_id)
                 DO UPDATE
                 SET
-                    user_id = excluded.user_id,
-                    lacking_context = 1,
+                    correct_count = 1,
                     reviewed = 1,
                     updated_at = CURRENT_TIMESTAMP
             """, (question_id, user_id))
@@ -99,7 +97,7 @@ def update_progress(subject, question_id, status, user_id):
                             INSERT INTO user_progress_physics (
                                 question_id,
                                 user_id,
-                                lacking_context,
+                                correct_count,
                                 reviewed,
                                 updated_at
                             )
@@ -107,19 +105,18 @@ def update_progress(subject, question_id, status, user_id):
                             ON CONFLICT(question_id)
                             DO UPDATE
                             SET
-                                user_id = excluded.user_id,
-                                lacking_context = 1,
+                                correct_count = 1,
                                 reviewed = 1,
                                 updated_at = CURRENT_TIMESTAMP
                         """, (question_id, user_id))
     elif status == "partially_correct":
-        print("[DEBUG] Marking question as partially correct...")
+       
         if subject == "Chemistry":
             cursor.execute("""
                 INSERT INTO user_progress_chemistry (
                     question_id,
                     user_id,
-                    lacking_context,
+                    partially_correct_count,
                     reviewed,
                     updated_at
                 )
@@ -127,8 +124,7 @@ def update_progress(subject, question_id, status, user_id):
                 ON CONFLICT(question_id)
                 DO UPDATE
                 SET
-                    user_id = excluded.user_id,
-                    lacking_context = 1,
+                    partially_correct_count = 1,
                     reviewed = 1,
                     updated_at = CURRENT_TIMESTAMP
             """, (question_id, user_id))
@@ -137,7 +133,7 @@ def update_progress(subject, question_id, status, user_id):
                             INSERT INTO user_progress_physics (
                                 question_id,
                                 user_id,
-                                lacking_context,
+                                partially_correct_count,
                                 reviewed,
                                 updated_at
                             )
@@ -145,19 +141,18 @@ def update_progress(subject, question_id, status, user_id):
                             ON CONFLICT(question_id)
                             DO UPDATE
                             SET
-                                user_id = excluded.user_id,
-                                lacking_context = 1,
+                                partially_correct_count = 1,
                                 reviewed = 1,
                                 updated_at = CURRENT_TIMESTAMP
                         """, (question_id, user_id))
     elif status == "incorrect":
-        print("[DEBUG] Marking question as incorrect...")
+     
         if subject == "Chemistry":
             cursor.execute("""
                 INSERT INTO user_progress_chemistry (
                     question_id,
                     user_id,
-                    lacking_context,
+                    incorrect_count,
                     reviewed,
                     updated_at
                 )
@@ -165,8 +160,7 @@ def update_progress(subject, question_id, status, user_id):
                 ON CONFLICT(question_id)
                 DO UPDATE
                 SET
-                    user_id = excluded.user_id,
-                    lacking_context = 1,
+                    incorrect_count = 1,
                     reviewed = 1,
                     updated_at = CURRENT_TIMESTAMP
             """, (question_id, user_id))
@@ -175,7 +169,7 @@ def update_progress(subject, question_id, status, user_id):
                 INSERT INTO user_progress_physics (
                     question_id,
                     user_id,
-                    lacking_context,
+                    incorrect_count,
                     reviewed,
                     updated_at
                 )
@@ -183,26 +177,27 @@ def update_progress(subject, question_id, status, user_id):
                 ON CONFLICT(question_id)
                 DO UPDATE
                 SET
-                    user_id = excluded.user_id,
-                    lacking_context = 1,
+                    incorrect_count = 1,
                     reviewed = 1,
                     updated_at = CURRENT_TIMESTAMP
             """, (question_id, user_id))
 
     conn.commit()
     conn.close()
-    print("[DEBUG] update_progress completed.")
+
 
 def get_progress(subject, user_id):
     """
     Get the total number of questions and the number of reviewed questions.
     Exclude questions marked as 'lacking context' or invalid multipart questions.
     """
+    print("Getting Progress")
     conn = get_db_connection(subject) # Connect to ChemQuestionsDatabase
     game_conn = connect_game_db()  # Connect to Game Database
     cursor = conn.cursor()
     game_cursor = game_conn.cursor()
-
+    if game_cursor:
+        print("game_cursor not null")
     # Fetch all questions and filter them in Python
     cursor.execute("SELECT id, reference_code, paper FROM questions")
     questions = cursor.fetchall()
@@ -212,7 +207,7 @@ def get_progress(subject, user_id):
         q for q in questions if not should_exclude_question(q[1], q[2])
     ]
     total_questions = len(valid_questions)
-
+    print(total_questions)
     # Reviewed questions from the game's database
     if subject == "Chemistry":
         game_cursor.execute("SELECT COUNT(*) FROM user_progress_chemistry WHERE reviewed = 1 AND lacking_context = 0 AND user_id = ?", (user_id,))

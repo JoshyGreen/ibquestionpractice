@@ -119,10 +119,7 @@ def main():
                 else:
                     st.write("No questions available for this syllabus link!")
 
-        # Progress Bar
-        reviewed, total = get_progress(subject, user_id)
-        st.sidebar.write(f"Progress: {reviewed}/{total}")
-        st.sidebar.progress(reviewed / total if total > 0 else 0)
+    
 
         # Confirmation logic for Reset Progress
         if "confirm_reset" not in st.session_state:
@@ -277,7 +274,6 @@ def display_question(subject, QuestionMode, question, user_id):
         # Add buttons for progress tracking
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            print("Button displayed in col1")
             if st.button("Correct", key=f"correct_{question_id}"):
                 print("attempting to upadate progress for questions" + str(question_id))
                 update_progress(subject, question_id, "correct", user_id)
