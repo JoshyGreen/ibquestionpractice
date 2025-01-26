@@ -278,6 +278,7 @@ def display_question(subject, QuestionMode, question, user_id):
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             if st.button("Correct", key=f"correct_{question_id}"):
+                print("attempting to upadate progress for questions" + str(question_id))
                 update_progress(subject, question_id, "correct", user_id)
                 load_next_question(subject, QuestionMode, user_id)
                 st.rerun()
