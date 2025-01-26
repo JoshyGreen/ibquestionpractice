@@ -6,7 +6,7 @@ def mark_as_lacking_context(subject, question_id, user_id):
     """
     conn = connect_game_db()
     cursor = conn.cursor()
-    print("updating question" + str(question_id))
+
 
     if subject =="Chemistry":
         cursor.execute("""
@@ -71,7 +71,8 @@ def update_progress(subject, question_id, status, user_id):
     """
     conn = connect_game_db()
     cursor = conn.cursor()
-
+    print("updating question" + str(question_id))
+    
     if status == "correct":
         if subject == "Chemistry":
             cursor.execute("""
