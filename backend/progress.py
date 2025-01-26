@@ -6,7 +6,7 @@ def mark_as_lacking_context(subject, question_id, user_id):
     """
     conn = connect_game_db()
     cursor = conn.cursor()
-    print("updating question" + question_id)
+    print("updating question" + str(question_id))
 
     if subject =="Chemistry":
         cursor.execute("""
