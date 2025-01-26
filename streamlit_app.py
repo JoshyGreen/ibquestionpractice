@@ -2,11 +2,10 @@ import streamlit as st
 
 from backend.database import get_db_connection, connect_game_db
 from backend.question_handler import get_random_question, get_random_question_by_paper, get_questions_by_syllabus, get_all_syllabus_links
-from backend.progress import update_progress, get_progress, reset_progress, mark_as_lacking_context, remove_question_from_progress
+from backend.progress import update_progress, get_progress, reset_progress, mark_as_lacking_context
 from backend.auth import show_signup, show_login
 
 def main():
-    print("PRINTING TO THE LOG WORKS")
     # If not logged in, show login or signup
     if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
         # Show login/signup
@@ -119,7 +118,10 @@ def main():
                 else:
                     st.write("No questions available for this syllabus link!")
 
-    
+        # Progress Bar
+        reviewed, total = get_progress(subject, user_id)
+        st.sidebar.write(f"Progress: {reviewed}/{total}")
+        st.sidebar.progress(reviewed / total if total > 0 else 0)
 
         # Confirmation logic for Reset Progress
         if "confirm_reset" not in st.session_state:
@@ -275,7 +277,6 @@ def display_question(subject, QuestionMode, question, user_id):
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             if st.button("Correct", key=f"correct_{question_id}"):
-                print("attempting to upadate progress for questions" + str(question_id))
                 update_progress(subject, question_id, "correct", user_id)
                 load_next_question(subject, QuestionMode, user_id)
                 st.rerun()
@@ -386,19 +387,7 @@ def show_history(subject, user_id):
             WHERE id = ?
         """, (q_id,))
         question_row = cursor.fetchone()
-        col1, col2 = st.columns(2)
-        # "Show Question" button
-        with col1:
-            if st.button("Show Question", key=f"show_{q_id}"):
-                st.session_state["show_history_question_id"] = q_id
-                st.rerun()
 
-        # "Remove from Progress" button
-        with col2:
-            if st.button("Remove from History", key=f"remove_{q_id}"):
-                remove_question_from_progress(q_id, user_id)
-                st.success(f"Removed question {q_id} from your progress.")
-                st.rerun()
         if question_row:
             reference_code, paper = question_row
             final_results.append({
@@ -410,7 +399,6 @@ def show_history(subject, user_id):
                 "incorrect": incorrect,
                 "updated_at": updated_at
             })
-
 
     conn.close()
 
