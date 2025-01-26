@@ -9,7 +9,6 @@ GAME_DB_PATH = os.path.join(os.path.dirname(__file__), "../questions_game.db")  
 
 def connect_chem_db():
     """Connect to the ChemQuestionsDatabase."""
-    print(tables)
     return sqlite3.connect(CHEM_DB_PATH)
 
 def connect_phys_db():
