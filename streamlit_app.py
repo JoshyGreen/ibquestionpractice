@@ -7,6 +7,7 @@ from backend.progress import update_progress, get_progress, reset_progress, mark
 from backend.auth import show_signup, show_login
 
 def main():
+    print("PRINTING TO THE LOG WORKS")
     # If not logged in, show login or signup
     if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
         # Show login/signup
