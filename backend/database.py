@@ -4,7 +4,7 @@ import os
 
 CHEM_DB_PATH =  os.path.join(os.path.dirname(__file__), "../ChemQuestionsDataBase.db")  # Path to the external database
 PHYS_DB_PATH = os.path.join(os.path.dirname(__file__), "../PhysicsQuestionsDataBase.db")
-GAME_DB_PATH = os.path.join(os.path.dirname(__file__), "../questions_game.db")  # Path to the game database in the project root
+GAME_DB_PATH = os.path.join(os.path.dirname(__file__), "../questionsgame.db")  # Path to the game database in the project root
 
 
 def connect_chem_db():
