@@ -69,8 +69,7 @@ def update_progress(subject, question_id, status, user_id):
     Update the progress for a question based on the status.
     Status can be "correct", "partially_correct", or "incorrect".
     """
-    print(f"[DEBUG] update_progress called with "
-          f"question_id={question_id}, subject={subject}, status={status}, user_id={user_id}")
+    print(f"[DEBUG] update_progress called with " + f"question_id={question_id}, subject={subject}, status={status}, user_id={user_id}")
     conn = connect_game_db()
     cursor = conn.cursor()
     print("updating question" + str(question_id))
