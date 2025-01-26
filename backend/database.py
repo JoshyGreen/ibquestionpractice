@@ -2,22 +2,18 @@ import sqlite3
 import os
 
 
-CHEM_DB_PATH =  os.path.join(os.path.dirname(__file__), "../ChemQuestionsDatabase.db")  # Path to the external database
+CHEM_DB_PATH =  os.path.join(os.path.dirname(__file__), "../ChemQuestionsDataBase.db")  # Path to the external database
 PHYS_DB_PATH = os.path.join(os.path.dirname(__file__), "../PhysicsQuestionsDataBase.db")
 GAME_DB_PATH = os.path.join(os.path.dirname(__file__), "../questions_game.db")  # Path to the game database in the project root
 
 
 def connect_chem_db():
     """Connect to the ChemQuestionsDatabase."""
-    print("Connected to ChemQuestionsDatabase")
-    cursor = sqlite3.connect(CHEM_DB_PATH).cursor()
-    tables = cursor.execute("""SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'""")
     print(tables)
     return sqlite3.connect(CHEM_DB_PATH)
 
 def connect_phys_db():
     """Connect to the PhysicsQuestionsDatabase."""
-    print("Connected to PhysicsQuestionsDatabase")
     return sqlite3.connect(PHYS_DB_PATH)
 
 def connect_game_db():
