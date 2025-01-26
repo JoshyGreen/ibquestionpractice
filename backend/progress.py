@@ -69,11 +69,14 @@ def update_progress(subject, question_id, status, user_id):
     Update the progress for a question based on the status.
     Status can be "correct", "partially_correct", or "incorrect".
     """
+    print(f"[DEBUG] update_progress called with "
+          f"question_id={question_id}, subject={subject}, status={status}, user_id={user_id}")
     conn = connect_game_db()
     cursor = conn.cursor()
     print("updating question" + str(question_id))
     
     if status == "correct":
+         print("[DEBUG] Marking question as correct in user_progress...")
         if subject == "Chemistry":
             cursor.execute("""
                 INSERT INTO user_progress_chemistry (
@@ -111,6 +114,7 @@ def update_progress(subject, question_id, status, user_id):
                                 updated_at = CURRENT_TIMESTAMP
                         """, (question_id, user_id))
     elif status == "partially_correct":
+        print("[DEBUG] Marking question as partially correct...")
         if subject == "Chemistry":
             cursor.execute("""
                 INSERT INTO user_progress_chemistry (
@@ -148,6 +152,7 @@ def update_progress(subject, question_id, status, user_id):
                                 updated_at = CURRENT_TIMESTAMP
                         """, (question_id, user_id))
     elif status == "incorrect":
+        print("[DEBUG] Marking question as incorrect...")
         if subject == "Chemistry":
             cursor.execute("""
                 INSERT INTO user_progress_chemistry (
@@ -187,6 +192,7 @@ def update_progress(subject, question_id, status, user_id):
 
     conn.commit()
     conn.close()
+    print("[DEBUG] update_progress completed.")
 
 def get_progress(subject, user_id):
     """
