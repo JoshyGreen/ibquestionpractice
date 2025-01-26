@@ -2,8 +2,8 @@ import sqlite3
 import os
 
 
-CHEM_DB_PATH = "ChemQuestionsDatabase.db"  # Path to the external database
-PHYS_DB_PATH = "PhysicsQuestionsDataBase.db"
+CHEM_DB_PATH =  os.path.join(os.path.dirname(__file__), "../ChemQuestionsDatabase.db")  # Path to the external database
+PHYS_DB_PATH = os.path.join(os.path.dirname(__file__), "../PhysicsQuestionsDataBase.db")
 GAME_DB_PATH = os.path.join(os.path.dirname(__file__), "../questions_game.db")  # Path to the game database in the project root
 
 
