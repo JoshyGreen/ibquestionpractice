@@ -210,10 +210,9 @@ def should_exclude_question(id, subject, reference_code, paper, user_id):
         return False
 
     if subject == "Chemistry":
-        lacking_context = g.execute("""SELECT * FROM user_progress_chemistry WHERE question_id = ? AND user_id = ?""", (id,user_id,))
+        lacking_context = g.execute( """SELECT * FROM user_progress_chemistry WHERE question_id = :q_id AND user_id = :u_id""", {"q_id": id, "u_id": user_id})
     else:
-        lacking_context = g.execute("""SELECT * FROM user_progress_physics WHERE question_id = ? AND user_id = ?""", (id,user_id,))
-
+        lacking_context = g.execute( """SELECT * FROM user_progress_physics WHERE question_id = :q_id AND user_id = :u_id""", {"q_id": id, "u_id": user_id})
     if lacking_context.fetchone():
         return True
     # Extract the part after the last full stop
