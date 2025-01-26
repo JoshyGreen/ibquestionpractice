@@ -2,7 +2,7 @@ import streamlit as st
 
 from backend.database import get_db_connection, connect_game_db
 from backend.question_handler import get_random_question, get_random_question_by_paper, get_questions_by_syllabus, get_all_syllabus_links
-from backend.progress import update_progress, get_progress, reset_progress, mark_as_lacking_context, \
+from backend.progress import update_progress, get_progress, reset_progress, mark_as_lacking_context,
     remove_question_from_progress
 from backend.auth import show_signup, show_login
 
