@@ -75,7 +75,7 @@ def update_progress(subject, question_id, status, user_id):
     print("updating question" + str(question_id))
     
     if status == "correct":
-         print("[DEBUG] Marking question as correct in user_progress...")
+        print("[DEBUG] Marking question as correct in user_progress...")
         if subject == "Chemistry":
             cursor.execute("""
                 INSERT INTO user_progress_chemistry (
