@@ -196,7 +196,7 @@ def get_progress(subject, user_id):
 
     return reviewed_questions, total_questions
 
-def should_exclude_question(id, subject, reference_code, paper):
+def should_exclude_question(id, subject, reference_code, paper, user_id):
     """
     Determine if a question should be excluded based on its reference_code and paper type.
 
@@ -210,9 +210,9 @@ def should_exclude_question(id, subject, reference_code, paper):
         return False
 
     if subject == "Chemistry":
-        lacking_context = g.execute("""SELECT * FROM user_progress_chemistry WHERE question_id = ?""", (id,))
+        lacking_context = g.execute("""SELECT * FROM user_progress_chemistry WHERE question_id = ? AND user_id = ?""", (id,user_id,))
     else:
-        lacking_context = g.execute("""SELECT * FROM user_progress_physics WHERE question_id = ?""", (id,))
+        lacking_context = g.execute("""SELECT * FROM user_progress_physics WHERE question_id = ? AND user_id = ?""", (id,user_id,))
 
     if lacking_context.fetchone():
         return True
