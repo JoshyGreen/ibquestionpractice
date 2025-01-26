@@ -9,10 +9,12 @@ GAME_DB_PATH = os.path.join(os.path.dirname(__file__), "../questions_game.db")  
 
 def connect_chem_db():
     """Connect to the ChemQuestionsDatabase."""
+    print("Connected to ChemQuestionsDatabase")
     return sqlite3.connect(CHEM_DB_PATH)
 
 def connect_phys_db():
     """Connect to the PhysicsQuestionsDatabase."""
+    print("Connected to PhysicsQuestionsDatabase")
     return sqlite3.connect(PHYS_DB_PATH)
 
 def connect_game_db():
