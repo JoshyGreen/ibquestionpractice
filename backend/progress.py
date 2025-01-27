@@ -9,18 +9,38 @@ def mark_as_lacking_context(subject, question_id, user_id):
 
     if subject =="Chemistry":
         cursor.execute("""
-            INSERT INTO user_progress_chemistry (question_id, lacking_context, reviewed)
-            VALUES (?, 1, 1)
-            ON CONFLICT(question_id) DO UPDATE
-            SET lacking_context = 1, reviewed = 1, user_id = ?, updated_at = CURRENT_TIMESTAMP
-        """, (question_id, user_id))
+                INSERT INTO user_progress_chemistry (
+                    question_id,
+                    user_id,
+                    lacking_context,
+                    reviewed,
+                    updated_at
+                )
+                VALUES (?, ?, 1, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT(question_id)
+                DO UPDATE
+                SET
+                    lacking_context = 1,
+                    reviewed = 1,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (question_id, user_id))
     else:
         cursor.execute("""
-           INSERT INTO user_progress_physics (question_id, lacking_context, reviewed)
-           VALUES (?, 1, 1)
-           ON CONFLICT(question_id) DO UPDATE
-           SET lacking_context = 1, reviewed = 1, user_id = ?, updated_at = CURRENT_TIMESTAMP
-       """, (question_id, user_id))
+                INSERT INTO user_progress_physics (
+                    question_id,
+                    user_id,
+                    lacking_context,
+                    reviewed,
+                    updated_at
+                )
+                VALUES (?, ?, 1, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT(question_id)
+                DO UPDATE
+                SET
+                    lacking_context = 1,
+                    reviewed = 1,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (question_id, user_id))
 
     conn.commit()
     conn.close()
@@ -180,15 +200,21 @@ def get_progress(subject, user_id):
     print(len(questions))
     # Filter out questions to exclude
     valid_questions = [
-        q for q in questions if not should_exclude_question(q[0], subject, q[1], q[2])
+        q for q in questions if not should_exclude_question(q[0], subject, q[1], q[2], user_id)
     ]
+
     total_questions = len(valid_questions)
-    print(total_questions)
+
     # Reviewed questions from the game's database
     if subject == "Chemistry":
-        game_cursor.execute("SELECT COUNT(*) FROM user_progress_chemistry WHERE reviewed = 1 AND lacking_context = 0 AND user_id = ?", (user_id,))
+        contextless = game_cursor.execute("""SELECT COUNT(*) FROM user_progress_chemistry WHERE lacking_context = 1 AND user_id = ?""", (user_id,)).fetchone()[0]
+        game_cursor.execute("SELECT COUNT(*) FROM user_progress_chemistry WHERE lacking_context = 0 AND user_id = ?", (user_id,))
     else:
-        game_cursor.execute("SELECT COUNT(*) FROM user_progress_physics WHERE reviewed = 1 AND lacking_context = 0 AND user_id = ?", (user_id,))
+        contextless = game_cursor.execute(
+            """SELECT COUNT(*) FROM user_progress_physics WHERE lacking_context = 1 AND user_id = ?""", (user_id,)).fetchone()[0]
+        game_cursor.execute("SELECT COUNT(*) FROM user_progress_physics WHERE lacking_context = 0 AND user_id = ?", (user_id,))
+    print(contextless)
+    total_questions = total_questions - contextless
     reviewed_questions = game_cursor.fetchone()[0]
 
     conn.close()
@@ -209,12 +235,6 @@ def should_exclude_question(id, subject, reference_code, paper, user_id):
     if paper == "1B":  # Always include Paper 1B questions
         return False
 
-    if subject == "Chemistry":
-        lacking_context = g.execute( """SELECT * FROM user_progress_chemistry WHERE question_id = :q_id AND user_id = :u_id""", {"q_id": id, "u_id": user_id})
-    else:
-        lacking_context = g.execute( """SELECT * FROM user_progress_physics WHERE question_id = :q_id AND user_id = :u_id""", {"q_id": id, "u_id": user_id})
-    if lacking_context.fetchone():
-        return True
     # Extract the part after the last full stop
     last_part = reference_code.split(".")[-1]
 
