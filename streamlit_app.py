@@ -354,7 +354,7 @@ def display_question(subject, QuestionMode, question, user_id, toggle_key=None):
                     st.session_state[toggle_key] = False
                 else:
                     load_next_question(subject, QuestionMode, user_id)
-                st.rerun()
+                    st.rerun()
                 
             
 
