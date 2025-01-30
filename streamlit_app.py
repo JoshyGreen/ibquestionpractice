@@ -329,23 +329,34 @@ def display_question(subject, QuestionMode, question, user_id, toggle_key=None):
                 index=["A", "B", "C", "D"].index(st.session_state[mc_key]),
                 key=mc_key
             )
-
-            if st.button("Submit Answer", key=f"submit_{question_id}"):
-                user_choice = st.session_state[mc_key]
-                # Compare user choice to correct option
-                if user_choice == correct_option:
-                    st.session_state[feedback_key] = f"✅ Correct! The answer is **{correct_option}**."
-                    update_progress(subject, question_id, "correct", user_id)
+            col5, col6= st.columns(2)
+            with col5:
+                if st.button("Submit Answer", key=f"submit_{question_id}"):
+                    user_choice = st.session_state[mc_key]
+                    # Compare user choice to correct option
+                    if user_choice == correct_option:
+                        st.session_state[feedback_key] = f"✅ Correct! The answer is **{correct_option}**."
+                        update_progress(subject, question_id, "correct", user_id)
+                    else:
+                        st.session_state[feedback_key] = (
+                            f"❌ Incorrect. You chose **{user_choice}**, "
+                            f"but the correct answer is **{correct_option}**."
+                        )
+                        update_progress(subject, question_id, "incorrect", user_id)
+    
+                    # Mark "submitted" so we can show feedback + Next
+                    st.session_state[submitted_key] = True
+                    # We *don't* rerun now. We want to show feedback immediately in the same run.
+            with col6:
+                if st.button("Lack Context", key=f"lacking_context_{question_id}"):
+                mark_as_lacking_context(subject, question_id, user_id)
+                if QuestionMode == "Fetch" and toggle_key is not None:
+                    st.session_state[toggle_key] = False
                 else:
-                    st.session_state[feedback_key] = (
-                        f"❌ Incorrect. You chose **{user_choice}**, "
-                        f"but the correct answer is **{correct_option}**."
-                    )
-                    update_progress(subject, question_id, "incorrect", user_id)
-
-                # Mark "submitted" so we can show feedback + Next
-                st.session_state[submitted_key] = True
-                # We *don't* rerun now. We want to show feedback immediately in the same run.
+                    load_next_question(subject, QuestionMode, user_id)
+                st.rerun()
+                
+            
 
         # 3) If the user *has* submitted, show the feedback and "Next" button
         if st.session_state[submitted_key]:
