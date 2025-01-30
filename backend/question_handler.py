@@ -19,7 +19,7 @@ def fetch_question_by_id(subject, question_id):
     conn.close()
     return row  # e.g., (html, markscheme, examiner_report)
 
-def get_random_question(subject, user_id):
+def get_random_question(subject, user_id, hl=True):
     print(f"Getting questions from {subject}")
     chem_conn = get_db_connection(subject)
     game_conn = connect_game_db()
@@ -30,7 +30,7 @@ def get_random_question(subject, user_id):
 
     query = f"""
         SELECT question_id FROM {subject}
-        WHERE reviewed = 1 AND user_id = ?
+        WHERE correct_count = 1 AND user_id = ?
     """
     game_cursor.execute(query, (user_id,))
 
@@ -69,7 +69,7 @@ def get_random_question_by_paper(subject, paper, user_id):
 
     query = f"""
                SELECT question_id FROM {subject}
-               WHERE reviewed = 1 AND user_id = ?
+               WHERE correct_count = 1  AND user_id = ?
            """
     g.execute(query, (user_id,))
     reviewed_ids = [row[0] for row in g.fetchall()]
@@ -145,7 +145,7 @@ def get_questions_by_syllabus(subject, selected_syllabus, user_id):
 
     query = f"""
                    SELECT question_id FROM {subject}
-                   WHERE reviewed = 1 AND user_id = ?
+                   WHERE correct_count = 1 AND user_id = ?
                """
     g.execute(query, (user_id,))
     reviewed_ids = [row[0] for row in g.fetchall()]
