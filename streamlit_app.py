@@ -349,7 +349,7 @@ def display_question(subject, QuestionMode, question, user_id, toggle_key=None):
                     # We *don't* rerun now. We want to show feedback immediately in the same run.
             with col6:
                 if st.button("Lack Context", key=f"lacking_context_{question_id}"):
-                mark_as_lacking_context(subject, question_id, user_id)
+                    mark_as_lacking_context(subject, question_id, user_id)
                 if QuestionMode == "Fetch" and toggle_key is not None:
                     st.session_state[toggle_key] = False
                 else:
