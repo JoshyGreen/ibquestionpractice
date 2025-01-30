@@ -101,7 +101,7 @@ def get_progress(subject, user_id):
 
     # Reviewed questions from the game's database
     query1 = f"""SELECT COUNT(*) FROM {subject} WHERE lacking_context =1 AND user_id = ?"""
-    query2 = f"""SELECT COUNT(*) FROM {subject} WHERE lacking_context = 0 AND user_id = ?"""
+    query2 = f"""SELECT COUNT(*) FROM {subject} WHERE correct_count = 1 AND user_id = ?"""
     contextless = game_cursor.execute(query1, (user_id,)).fetchone()[0]
     total_questions = total_questions - contextless
     reviewed_questions = game_cursor.execute(query2,(user_id,)).fetchone()[0]
