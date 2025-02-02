@@ -353,8 +353,6 @@ def display_question(subject, QuestionMode, question, user_id, toggle_key=None):
                    
                 if QuestionMode == "Fetch" and toggle_key is not None:
                     st.session_state[toggle_key] = False
-                else:
-                    load_next_question(subject, QuestionMode, user_id)
 
                 
             
