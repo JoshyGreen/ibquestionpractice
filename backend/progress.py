@@ -128,7 +128,7 @@ def should_exclude_question(id, subject, reference_code, paper, user_id):
     last_part = reference_code.split(".")[-1]
 
     # Exclude if the last part is not numeric
-    if subject == "Mathematics":
+    if subject in ["Mathematics", "CompSci"]:
         return False
     else:
         return not last_part.isdigit()
