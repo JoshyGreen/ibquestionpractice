@@ -109,7 +109,7 @@ def main():
                 st.session_state.phys_syllabus_links = get_all_syllabus_links("Physics")
             if "math_syllabus_links" not in st.session_state:
                 st.session_state.math_syllabus_links = get_all_syllabus_links("Mathematics")
-            if "math_syllabus_links" not in st.session_state:
+            if "comp_syllabus_links" not in st.session_state:
                 st.session_state.comp_syllabus_links = get_all_syllabus_links("CompSci")
 
             st.session_state.chem_syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.chem_syllabus_links)
