@@ -7,6 +7,9 @@ PHYS_DB_PATH = "PhysicsQuestionsDataBase.db"
 MATH_DB_PATH = "MathematicsQuestionDataBase.db"
 GAME_DB_PATH = os.path.join(os.path.dirname(__file__), "../questions_game.db")  # Path to the game database in the project root
 
+def connect_comp_db():
+    """Connect to the ChemQuestionsDatabase."""
+    return sqlite3.connect("CompSciQuestionDataBase.db")
 
 def connect_chem_db():
     """Connect to the ChemQuestionsDatabase."""
@@ -30,6 +33,8 @@ def get_db_connection(subject):
         return connect_phys_db()
     elif subject == "Mathematics":
         return connect_math_db()
+    elif subject == "CompSci":
+        return connect_comp_db()
 
 
 
@@ -38,6 +43,19 @@ def create_game_database():
     conn = connect_game_db()
     cursor = conn.cursor()
 
+    cursor.execute("""
+            CREATE TABLE IF NOT EXISTS CompSci (
+                question_id INTEGER PRIMARY KEY,
+                correct_count INTEGER DEFAULT 0,
+                partially_correct_count INTEGER DEFAULT 0,
+                incorrect_count INTEGER DEFAULT 0,
+                reviewed BOOLEAN DEFAULT 0,
+                lacking_context BOOLEAN DEFAULT 0,
+                user_id INTEGER,
+                updated_at TIMESTAMP
+            )
+        """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS Chemistry (
             question_id INTEGER PRIMARY KEY,
