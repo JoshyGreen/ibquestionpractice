@@ -40,7 +40,7 @@ def main():
     if "subject" not in st.session_state:
         st.session_state["subject"] = "Chemistry"
 
-    subjects = ["Chemistry", "Physics", "Mathematics"]
+    subjects = ["Chemistry", "Physics", "Mathematics", "CompSci"]
     # Safely figure out which index the current subject has in the list
     default_idx = subjects.index(st.session_state["subject"]) if st.session_state["subject"] in subjects else 0
 
@@ -109,10 +109,13 @@ def main():
                 st.session_state.phys_syllabus_links = get_all_syllabus_links("Physics")
             if "math_syllabus_links" not in st.session_state:
                 st.session_state.math_syllabus_links = get_all_syllabus_links("Mathematics")
+            if "math_syllabus_links" not in st.session_state:
+                st.session_state.comp_syllabus_links = get_all_syllabus_links("CompSci")
 
             st.session_state.chem_syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.chem_syllabus_links)
             st.session_state.phys_syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.phys_syllabus_links)
             st.session_state.math_syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.math_syllabus_links)
+            st.session_state.comp_syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.comp_syllabus_links)
             _hierarchy = build_syllabus_hierarchy(st.session_state.math_syllabus_links)
             # Render the syllabus hierarchy and get the selected syllabus link
             st.markdown("### Syllabus Hierarchy")
@@ -125,6 +128,8 @@ def main():
                 selected_syllabus = render_syllabus_hierarchy(st.session_state.phys_syllabus_hierarchy)
             elif subject == "Mathematics":
                 selected_syllabus = render_syllabus_hierarchy(st.session_state.math_syllabus_hierarchy)
+            elif subject == "CompSci":
+                selected_syllabus = render_syllabus_hierarchy(st.session_state.comp_syllabus_hierarchy)
             else:
                 selected_syllabus = None
 
