@@ -1,12 +1,16 @@
-from backend.database import connect_game_db, get_db_connection
-from backend.progress import should_exclude_question
+from backend.database import get_db_connection
+from supabase import create_client, Client
+import sqlite3
+import os
 # Sanitize the subject to prevent SQL injection
 
+SUPABASE_URL = "https://ofaiofljgsxuamzaensq.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYWlvZmxqZ3N4dWFtemFlbnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NDc5NTcsImV4cCI6MjA1NTEyMzk1N30.jvMpQavl14H-kBr8x576VXGTizZ3yBoi7P-oEEQckuk"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def fetch_question_by_id(subject, question_id):
     """
-    Returns (html, markscheme_html, examiner_report_html) for a single question ID,
-    or None if not found.
+    Fetches question details from the SQLite `questions` table.
     """
     conn = get_db_connection(subject)
     c = conn.cursor()
@@ -17,24 +21,31 @@ def fetch_question_by_id(subject, question_id):
     """, (question_id,))
     row = c.fetchone()
     conn.close()
-    return row  # e.g., (html, markscheme, examiner_report)
+    return row
+
+def get_reviewed_question_ids(subject, user_id):
+    """
+    Fetches reviewed question IDs from Supabase `{subject}` table.
+    """
+    response = (
+        supabase.table(subject.lower())
+        .select("question_id")
+        .eq("user_id", user_id)
+        .or_("correct_count.eq.true,lacking_context.eq.true")
+        .execute()
+    )
+    return [row["question_id"] for row in response.data] if response.data else []
 
 def get_random_question(subject, user_id, hl=True):
-    print(f"Getting questions from {subject}")
-    chem_conn = get_db_connection(subject)
-    game_conn = connect_game_db()
-    chem_cursor = chem_conn.cursor()
-    game_cursor = game_conn.cursor()
-
-    # Fetch reviewed IDs for *this subject*
-
-    query = f"""
-        SELECT question_id FROM {subject}
-        WHERE correct_count = 1 AND user_id = ?
     """
-    game_cursor.execute(query, (user_id,))
+    Fetches a random question from the SQLite `questions` table,
+    excluding reviewed questions from Supabase.
+    """
+    print("Subject: "+ subject)
+    conn = get_db_connection(subject)
+    cursor = conn.cursor()
 
-    reviewed_ids = [row[0] for row in game_cursor.fetchall()]
+    reviewed_ids = get_reviewed_question_ids(subject, user_id)
 
     if reviewed_ids:
         placeholders = ",".join("?" for _ in reviewed_ids)
@@ -45,7 +56,7 @@ def get_random_question(subject, user_id, hl=True):
             ORDER BY RANDOM()
             LIMIT 1
         """
-        chem_cursor.execute(query, reviewed_ids)
+        cursor.execute(query, reviewed_ids)
     else:
         query = """
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
@@ -53,38 +64,31 @@ def get_random_question(subject, user_id, hl=True):
             ORDER BY RANDOM()
             LIMIT 1
         """
-        chem_cursor.execute(query)
+        cursor.execute(query)
 
-    question = chem_cursor.fetchone()
-
-    chem_conn.close()
-    game_conn.close()
+    question = cursor.fetchone()
+    conn.close()
     return question
 
 def get_random_question_by_paper(subject, paper, user_id):
+    """
+    Fetches a random question by paper, excluding reviewed questions.
+    """
     conn = get_db_connection(subject)
-    game_conn = connect_game_db()
-    c = conn.cursor()
-    g = game_conn.cursor()
+    cursor = conn.cursor()
 
-    query = f"""
-               SELECT question_id FROM {subject}
-               WHERE correct_count = 1  AND user_id = ?
-           """
-    g.execute(query, (user_id,))
-    reviewed_ids = [row[0] for row in g.fetchall()]
+    reviewed_ids = get_reviewed_question_ids(subject, user_id)
 
     if reviewed_ids:
         placeholders = ",".join("?" for _ in reviewed_ids)
         query = f"""
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
             FROM questions
-            WHERE paper = ?
-              AND id NOT IN ({placeholders})
+            WHERE paper = ? AND id NOT IN ({placeholders})
             ORDER BY RANDOM()
             LIMIT 1
         """
-        c.execute(query, [paper, *reviewed_ids])
+        cursor.execute(query, [paper, *reviewed_ids])
     else:
         query = """
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
@@ -93,27 +97,24 @@ def get_random_question_by_paper(subject, paper, user_id):
             ORDER BY RANDOM()
             LIMIT 1
         """
-        c.execute(query, [paper])
+        cursor.execute(query, [paper])
 
-    question = c.fetchone()
+    question = cursor.fetchone()
     conn.close()
-    game_conn.close()
     return question
 
 def get_all_questions_by_syllabus(subject, selected_syllabus):
     """
-    Retrieve all questions (not just one) for the given syllabus link.
-    Returns a list of question rows, or an empty list if none found.
+    Retrieves all questions from SQLite `questions` table for a given syllabus.
     """
     conn = get_db_connection(subject)
     cursor = conn.cursor()
 
-    # Return *all* matching rows
     query = """
         SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
         FROM questions
         WHERE syllabus_link LIKE ? OR syllabus_link LIKE ?
-        ORDER BY reference_code 
+        ORDER BY reference_code
     """
     cursor.execute(query, [f"%{selected_syllabus}%", f"%||{selected_syllabus}%"])
     rows = cursor.fetchall()
@@ -121,10 +122,12 @@ def get_all_questions_by_syllabus(subject, selected_syllabus):
     conn.close()
     return rows
 
+
 def get_all_syllabus_links(subject):
     """
-    Retrieve all unique syllabus links from the database.
+    Retrieves all unique syllabus links from SQLite `questions` table.
     """
+    print("Subject:" + subject)
     conn = get_db_connection(subject)
     cursor = conn.cursor()
 
@@ -136,21 +139,14 @@ def get_all_syllabus_links(subject):
 
 def get_questions_by_syllabus(subject, selected_syllabus, user_id):
     """
-    Retrieve a single random question filtered by the selected syllabus link.
+    Fetches a single random question filtered by syllabus link.
+    Excludes reviewed questions from Supabase.
     """
-    game_conn = connect_game_db()
-    g = game_conn.cursor()
     conn = get_db_connection(subject)
-    c = conn.cursor()
+    cursor = conn.cursor()
 
-    query = f"""
-                   SELECT question_id FROM {subject}
-                   WHERE correct_count = 1 AND user_id = ?
-               """
-    g.execute(query, (user_id,))
-    reviewed_ids = [row[0] for row in g.fetchall()]
+    reviewed_ids = get_reviewed_question_ids(subject, user_id)
 
-    # Normalize the selected syllabus
     selected_syllabus = selected_syllabus.strip()
 
     if reviewed_ids:
@@ -164,7 +160,7 @@ def get_questions_by_syllabus(subject, selected_syllabus, user_id):
                LIMIT 1
            """
         params = [f"%{selected_syllabus}%", f"%||{selected_syllabus}%"] + reviewed_ids
-        c.execute(query, params)
+        cursor.execute(query, params)
     else:
         query = """
                SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
@@ -173,12 +169,12 @@ def get_questions_by_syllabus(subject, selected_syllabus, user_id):
                ORDER BY RANDOM()
                LIMIT 1
            """
-        c.execute(query, [f"%{selected_syllabus}%", f"%||{selected_syllabus}%"])
+        cursor.execute(query, [f"%{selected_syllabus}%", f"%||{selected_syllabus}%"])
 
-    question = c.fetchone()
+    question = cursor.fetchone()
 
     conn.close()
-    game_conn.close()
     return question
+
 
 
