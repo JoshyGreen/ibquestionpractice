@@ -1,96 +1,136 @@
 import streamlit as st
+from supabase import create_client, Client
 import bcrypt
-from backend.database import connect_game_db
 
-# -------------------------
-# Password hashing helpers
-# -------------------------
-def hash_password(password: str) -> str:
-    # bcrypt.gensalt() automatically handles generating the salt
-    hashed_bytes = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
-    return hashed_bytes.decode("utf-8")
+SUPABASE_URL = "https://ofaiofljgsxuamzaensq.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYWlvZmxqZ3N4dWFtemFlbnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NDc5NTcsImV4cCI6MjA1NTEyMzk1N30.jvMpQavl14H-kBr8x576VXGTizZ3yBoi7P-oEEQckuk"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def check_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
-# -------------------------
-# Sign-up logic
-# -------------------------
-def sign_up(username: str, password: str) -> (bool, str):
-    """
-    Creates a new user in the 'users' table with the given username and hashed password.
-    Returns (success, message).
-    """
-    conn = connect_game_db()
-    cursor = conn.cursor()
+def initialize_session():
+    """Ensure session state variables are initialized."""
+    if "session" not in st.session_state:
+        st.session_state["session"] = None
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    if "user_id" not in st.session_state:
+        st.session_state["user_id"] = None
+    if "username" not in st.session_state:
+        st.session_state["username"] = None
 
-    # Check if username already exists
-    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
-    existing_user = cursor.fetchone()
-    if existing_user:
-        conn.close()
-        return False, "Username is already taken."
 
-    # Insert new user
-    hashed_pw = hash_password(password)
-    cursor.execute(
-        "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-        (username, hashed_pw)
-    )
-    conn.commit()
-    conn.close()
+def save_session(session):
+    """Save session information in Streamlit session state."""
+    st.session_state["session"] = session
+    st.session_state["logged_in"] = True
+    st.session_state["user_id"] = session["user"]["id"]
+    st.session_state["username"] = get_username(session["user"]["id"])
+    st.session_state["access_token"] = session["access_token"]  # Save token for persistence
+    st.rerun()
 
-    return True, "Sign-up successful! You can now log in."
 
-def show_signup():
-    """
-    Streamlit UI to handle new user sign-up.
-    You can place this in app.py if you prefer, but it's often nice to keep it here.
-    """
-    st.subheader("Sign Up")
-    username = st.text_input("Username", key="024123")
-    password = st.text_input("Password", key="124053",  type="password")
-    confirm_password = st.text_input("Confirm Password", key="1230492", type="password")
+def get_username(user_id):
+    """Fetch username from Supabase using the user_id."""
+    response = supabase.table("users").select("username").eq("id", user_id).execute()
+    if response.data:
+        return response.data[0]["username"]
+    return "Unknown"
 
-    if st.button("Create Account"):
-        if not username or not password:
-            st.error("Username and Password cannot be empty.")
-            return
 
-        if password != confirm_password:
-            st.error("Passwords do not match.")
-            return
+def is_logged_in():
+    """Check if the user is logged in based on stored session or re-authenticate."""
+    if st.session_state["logged_in"]:
+        return True
 
-        success, msg = sign_up(username, password)
-        if success:
-            st.success(msg)
-        else:
-            st.error(msg)
+    # If user has an access token from a previous session, try to validate it
+    if "access_token" in st.session_state and st.session_state["access_token"]:
+        try:
+            user = supabase.auth.get_user(st.session_state["access_token"])
+            if user:
+                st.session_state["logged_in"] = True
+                st.session_state["user_id"] = user.id
+                st.session_state["username"] = get_username(user.id)
+                return True
+        except Exception:
+            pass
+
+    return False
+
+
+def logout():
+    """Log the user out and clear session data."""
+    supabase.auth.sign_out()
+    for key in ["session", "logged_in", "user_id", "username", "access_token"]:
+        st.session_state[key] = None
+    st.rerun()
+
+
+def login(username, password):
+    """Authenticate user and store session."""
+    response = supabase.table("users").select("id, password_hash").eq("username", username).execute()
+
+    if response.data:
+        user = response.data[0]
+        stored_password_hash = user["password_hash"]
+
+        # Verify password using bcrypt
+        if bcrypt.checkpw(password.encode(), stored_password_hash.encode()):
+            # Generate a Supabase session manually (optional)
+            session = {"user": {"id": user["id"]}, "access_token": "dummy_token"}
+            save_session(session)
+            return True
+    return False
+
+
+def sign_up(username, password):
+    """Register a new user in Supabase."""
+    response = supabase.table("users").select("id").eq("username", username).execute()
+    if response.data:
+        return False, "Username already exists."
+
+    # Hash password before storing
+    hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+    data = {"username": username, "password_hash": hashed_pw}
+    insert_response = supabase.table("users").insert(data).execute()
+
+    if insert_response.data:
+        return True, "Sign-up successful! You can now log in."
+    return False, "An error occurred."
+
 
 def show_login():
-    st.write("## Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    """Show login UI inside a tab."""
+    st.subheader("Login")
+    username = st.text_input("Username", key="login_username")
+    password = st.text_input("Password", type="password", key="login_password")
+
     if st.button("Login"):
-        success, user_id = login(username, password)
+        success = login(username, password)
         if success:
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = username
-            st.session_state["user_id"] = user_id
+            st.success("Login successful! Redirecting...")
             st.rerun()
         else:
             st.error("Invalid username or password")
 
-def login(username, password):
-    conn = connect_game_db()
-    cursor = conn.cursor()
 
-    cursor.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
-    row = cursor.fetchone()
-    conn.close()
+def show_signup():
+    """Show sign-up UI inside a tab."""
+    st.subheader("Sign Up")
+    username = st.text_input("Username", key="signup_username")
+    password = st.text_input("Password", type="password", key="signup_password")
+    confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm_password")
 
-    if row:
-        user_id, password_hash = row
-        if check_password(password, password_hash):
-            return True, user_id
-    return False, None
+    if st.button("Create Account"):
+        if password != confirm_password:
+            st.error("Passwords do not match.")
+            return
+
+        success, message = sign_up(username, password)
+        if success:
+            st.success(message)
+        else:
+            st.error(message)
+
+
+
