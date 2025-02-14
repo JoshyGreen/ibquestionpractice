@@ -33,6 +33,6 @@ def get_db_connection(subject):
     elif subject == "MathAA":
         return connect_math_db()
     elif subject == "MathAI":
-        raise ValueError("MathAi Questions not imported yet (sorry franny)")
+        return connect_wierd_math_db()
     elif subject == "CompSci":
         return connect_comp_db()
