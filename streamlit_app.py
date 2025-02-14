@@ -1,27 +1,40 @@
 import streamlit as st
+from backend.database import get_db_connection
 from bs4 import BeautifulSoup
-
-from backend.database import get_db_connection, connect_game_db
 from backend.question_handler import get_random_question, get_random_question_by_paper, get_questions_by_syllabus, \
     get_all_syllabus_links, fetch_question_by_id, get_all_questions_by_syllabus
-from backend.progress import update_progress, get_progress, reset_progress, mark_as_lacking_context, \
-    remove_question_from_history
-from backend.auth import show_signup, show_login
+from backend.progress import update_progress, get_progress, reset_progress, mark_as_lacking_context
+from backend.auth import initialize_session, show_signup, is_logged_in, logout, show_login
+from supabase import create_client, Client
+import pandas as pd
+
+SUPABASE_URL = "https://ofaiofljgsxuamzaensq.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYWlvZmxqZ3N4dWFtemFlbnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NDc5NTcsImV4cCI6MjA1NTEyMzk1N30.jvMpQavl14H-kBr8x576VXGTizZ3yBoi7P-oEEQckuk"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def main():
-    # If not logged in, show login or signup
-    if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
-        # Show login/signup
-        tabs = st.tabs(["Login", "Sign Up"])
-        with tabs[0]:
-            show_login()
-        with tabs[1]:
-            show_signup()
-        return
+    st.title("Welcome to the App")
 
-    # Otherwise, show the main content
+    initialize_session()  # Ensure session keys exist
+
+    if not is_logged_in():
+        # 🔹 Show Login & Sign-Up tabs before logging in
+        tab1, tab2 = st.tabs(["Login", "Sign Up"])
+        with tab1:
+            show_login()
+        with tab2:
+            show_signup()
+        return  # Stop execution so the sidebar doesn't appear
+
+    # 🔹 Sidebar only appears after login
     st.sidebar.write(f"Logged in as: {st.session_state['username']}")
+    if st.sidebar.button("Logout"):
+        logout()
+
+    # 🔹 Main content after login
+    st.write("🎉 You are logged in!")
+
     user_id = st.session_state['user_id']
     # Initialize session state variables
     if "current_paper_type" not in st.session_state:
@@ -39,8 +52,11 @@ def main():
     st.sidebar.title("Subject")
     if "subject" not in st.session_state:
         st.session_state["subject"] = "Chemistry"
+    if "hl" not in st.session_state:
+        st.session_state.hl = True
 
-    subjects = ["Chemistry", "Physics", "Mathematics", "CompSci"]
+
+    subjects = ["Chemistry", "Physics", "MathAA", "MathAI", "CompSci" ]
     # Safely figure out which index the current subject has in the list
     default_idx = subjects.index(st.session_state["subject"]) if st.session_state["subject"] in subjects else 0
 
@@ -49,11 +65,11 @@ def main():
         subjects,
         index=default_idx
     )
+
     if "previous_subject" not in st.session_state:
         st.session_state.previous_subject = st.session_state["subject"]
 
     # If the user just changed the subject, reset random_question, current_paper_question, etc.
-
 
     st.session_state["subject"] = subject
 
@@ -103,35 +119,17 @@ def main():
         elif QuestionMode == "By Syllabus":
 
             # Fetch all syllabus links and build hierarchy
-            if "chem_syllabus_links" not in st.session_state:
-                st.session_state.chem_syllabus_links = get_all_syllabus_links("Chemistry")
-            if "phys_syllabus_links" not in st.session_state:
-                st.session_state.phys_syllabus_links = get_all_syllabus_links("Physics")
-            if "math_syllabus_links" not in st.session_state:
-                st.session_state.math_syllabus_links = get_all_syllabus_links("Mathematics")
-            if "comp_syllabus_links" not in st.session_state:
-                st.session_state.comp_syllabus_links = get_all_syllabus_links("CompSci")
+            if f"{subject}_syllabus_links" not in st.session_state:
+                st.session_state.syllabus_links = get_all_syllabus_links(subject)
 
-            st.session_state.chem_syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.chem_syllabus_links)
-            st.session_state.phys_syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.phys_syllabus_links)
-            st.session_state.math_syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.math_syllabus_links)
-            st.session_state.comp_syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.comp_syllabus_links)
-            _hierarchy = build_syllabus_hierarchy(st.session_state.math_syllabus_links)
+            st.session_state.syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.syllabus_links)
+
             # Render the syllabus hierarchy and get the selected syllabus link
             st.markdown("### Syllabus Hierarchy")
             # Show the "Show All Questions" checkbox
             show_all = st.checkbox("Show All Questions for this Syllabus.")
 
-            if subject == "Chemistry":
-                selected_syllabus = render_syllabus_hierarchy(st.session_state.chem_syllabus_hierarchy)
-            elif subject == "Physics":
-                selected_syllabus = render_syllabus_hierarchy(st.session_state.phys_syllabus_hierarchy)
-            elif subject == "Mathematics":
-                selected_syllabus = render_syllabus_hierarchy(st.session_state.math_syllabus_hierarchy)
-            elif subject == "CompSci":
-                selected_syllabus = render_syllabus_hierarchy(st.session_state.comp_syllabus_hierarchy)
-            else:
-                selected_syllabus = None
+            selected_syllabus = render_syllabus_hierarchy(st.session_state.syllabus_hierarchy)
 
             # Check if the selected syllabus has changed
             if selected_syllabus != st.session_state.selected_syllabus:
@@ -273,193 +271,175 @@ def extract_cardbody(html):
     soup = BeautifulSoup(html, 'html.parser')
     return soup.find('div', class_='card-body').get_text()
 
-def display_question(subject, QuestionMode, question, user_id, toggle_key=None):
-    if not question:
-        st.write("No more questions available!")
-        return
+def display_question(subject, QuestionMode, question, user_id, toggle_key=None, hl=True):
+    if question:
+        question_id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html = question
 
-    question_id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html = question
+        # Apply CSS to the question HTML
+        styled_html = apply_css_to_html(html, subject)
+        styled_markscheme_html = apply_css_to_html(markscheme_html, subject)
+        styled_examiner_notes = apply_css_to_html(examiner_report_html, subject)
 
-    # Apply CSS
-    styled_html = apply_css_to_html(html, subject)
-    styled_markscheme_html = apply_css_to_html(markscheme_html, subject)
-    styled_examiner_notes = apply_css_to_html(examiner_report_html, subject)
+        # Display question metadata
+        st.markdown(f"**Paper:** {paper}")
+        st.markdown(f"**Reference Code:** {reference_code}")
+        st.markdown(f"**Syllabus Link:** {syllabus_link}")
+        st.markdown(f"**Maximum Marks:** {maximum_marks}")
+        st.markdown(f"**Level:** {level}")
 
-    # Display question metadata
-    st.markdown(f"**Paper:** {paper}")
-    st.markdown(f"**Reference Code:** {reference_code}")
-    st.markdown(f"**Syllabus Link:** {syllabus_link}")
-    st.markdown(f"**Maximum Marks:** {maximum_marks}")
-    st.markdown(f"**Level:** {level}")
+        # Render the styled HTML ar
+        st.markdown(styled_html, unsafe_allow_html=True)
+        if (subject in ["Chemistry", "Physics"]) and paper == "1A":
+            # Extract the correct MCQ letter, e.g., "C" or "A"
+            correct_option = extract_cardbody(markscheme_html).strip()  # You already have this function
 
-    # Render the styled HTML question
-    st.markdown(styled_html, unsafe_allow_html=True)
-
-    # -----------------------------------------------------
-    # 1) Special Case: Paper 1A for Chemistry or Physics
-    # -----------------------------------------------------
-    if (subject in ["Chemistry", "Physics"]) and paper == "1A":
-        # Extract the correct MCQ letter, e.g., "C" or "A"
-        correct_option = extract_cardbody(markscheme_html).strip()  # You already have this function
-
-        # We'll store the user's MCQ choice in a radio button,
-        # and also track whether they've submitted.
-        mc_key = f"mc_choice_{question_id}"
-        submitted_key = f"mc_submitted_{question_id}"
-        feedback_key = f"mc_feedback_{question_id}"
-
-        # 1) Initialize session state if needed
-        if mc_key not in st.session_state:
-            st.session_state[mc_key] = "A"  # Default to "A"
-        if submitted_key not in st.session_state:
-            st.session_state[submitted_key] = False
-        if feedback_key not in st.session_state:
-            st.session_state[feedback_key] = ""
-
-        # 2) If the user has *not* submitted yet, show the radio and "Submit Answer" button
-        if not st.session_state[submitted_key]:
+            # We'll store the user's MCQ choice in a radio button,
+            # and also track whether they've submitted.
             mc_key = f"mc_choice_{question_id}"
             submitted_key = f"mc_submitted_{question_id}"
+            feedback_key = f"mc_feedback_{question_id}"
 
-            # Initialize defaults if needed:
+            # 1) Initialize session state if needed
             if mc_key not in st.session_state:
-                st.session_state[mc_key] = "A"
+                st.session_state[mc_key] = "A"  # Default to "A"
             if submitted_key not in st.session_state:
                 st.session_state[submitted_key] = False
-
-            # Just call st.radio(...) and store its return value
-            user_choice = st.radio(
-                "Select your answer:",
-                options=["A", "B", "C", "D"],
-                index=["A", "B", "C", "D"].index(st.session_state[mc_key]),
-                key=mc_key
-            )
-            col5, col6= st.columns(2)
-            with col5:
-                if st.button("Submit Answer", key=f"submit_{question_id}"):
-                    user_choice = st.session_state[mc_key]
-                    # Compare user choice to correct option
-                    if user_choice == correct_option:
-                        st.session_state[feedback_key] = f"✅ Correct! The answer is **{correct_option}**."
-                        update_progress(subject, question_id, "correct", user_id)
-                    else:
-                        st.session_state[feedback_key] = (
-                            f"❌ Incorrect. You chose **{user_choice}**, "
-                            f"but the correct answer is **{correct_option}**."
-                        )
-                        update_progress(subject, question_id, "incorrect", user_id)
-    
-                    # Mark "submitted" so we can show feedback + Next
-                    st.session_state[submitted_key] = True
-                    # We *don't* rerun now. We want to show feedback immediately in the same run.
-            with col6:
-                if st.button("Lack Context", key=f"lacking_context_{question_id}"):
-                    mark_as_lacking_context(subject, question_id, user_id)
-                   
-                if QuestionMode == "Fetch" and toggle_key is not None:
-                    st.session_state[toggle_key] = False
-
-                
-            
-
-        # 3) If the user *has* submitted, show the feedback and "Next" button
-        if st.session_state[submitted_key]:
-            # Show the feedback message
-            st.write(st.session_state[feedback_key])
-
-            # Optionally show examiner notes
-            if examiner_report_html and examiner_report_html.strip():
-                st.markdown("### Examiner Notes")
-                st.markdown(styled_examiner_notes, unsafe_allow_html=True)
-
-            # "Next" button
-            if st.button("Next", key=f"next_{question_id}"):
-                # Reset submission for next time
-                st.session_state[submitted_key] = False
+            if feedback_key not in st.session_state:
                 st.session_state[feedback_key] = ""
 
-                # Optionally clear the MCQ choice if you want to reset
-                st.session_state[mc_key] = "A"
+            # 2) If the user has *not* submitted yet, show the radio and "Submit Answer" button
+            if not st.session_state[submitted_key]:
+                mc_key = f"mc_choice_{question_id}"
+                submitted_key = f"mc_submitted_{question_id}"
 
-                # Decide how to move on
-                if QuestionMode == "Fetch" and toggle_key is not None:
+                # Initialize defaults if needed:
+                if mc_key not in st.session_state:
+                    st.session_state[mc_key] = "A"
+                if submitted_key not in st.session_state:
+                    st.session_state[submitted_key] = False
+
+                # Just call st.radio(...) and store its return value
+                user_choice = st.radio(
+                    "Select your answer:",
+                    options=["A", "B", "C", "D"],
+                    index=["A", "B", "C", "D"].index(st.session_state[mc_key]),
+                    key=mc_key
+                )
+                col5, col6 = st.columns(2)
+                with col5:
+                    if st.button("Submit Answer", key=f"submit_{question_id}"):
+                        user_choice = st.session_state[mc_key]
+                        # Compare user choice to correct option
+                        if user_choice == correct_option:
+                            st.session_state[feedback_key] = f"✅ Correct! The answer is **{correct_option}**."
+                            update_progress(subject, question_id, "correct", user_id)
+                        else:
+                            st.session_state[feedback_key] = (
+                                f"❌ Incorrect. You chose **{user_choice}**, "
+                                f"but the correct answer is **{correct_option}**."
+                            )
+                            update_progress(subject, question_id, "incorrect", user_id)
+
+                        # Mark "submitted" so we can show feedback + Next
+                        st.session_state[submitted_key] = True
+                        # We *don't* rerun now. We want to show feedback immediately in the same run.
+                with col6:
+                    if st.button("Lack Context", key=f"lacking_context_{question_id}"):
+                        mark_as_lacking_context(subject, question_id, user_id)
+                        st.session_state[submitted_key] = True
+
+
+            # 3) If the user *has* submitted, show the feedback and "Next" button
+            if st.session_state[submitted_key]:
+                # Show the feedback message
+                st.write(st.session_state[feedback_key])
+
+                # Optionally show examiner notes
+                if examiner_report_html and examiner_report_html.strip():
+                    st.markdown("### Examiner Notes")
+                    st.markdown(styled_examiner_notes, unsafe_allow_html=True)
+
+                # "Next" button
+                if st.button("Next", key=f"next_{question_id}"):
+                    # Reset submission for next time
+                    st.session_state[submitted_key] = False
+                    st.session_state[feedback_key] = ""
+
+                    # Optionally clear the MCQ choice if you want to reset
+                    st.session_state[mc_key] = "A"
+                    load_next_question(subject, QuestionMode, user_id)
+                    st.rerun()
+            return
+
+        # Show/Hide Markscheme Logic
+        if f"show_markscheme_{question_id}" not in st.session_state:
+            st.session_state[f"show_markscheme_{question_id}"] = False
+
+        if st.button(
+                "Show Markscheme" if not st.session_state[f"show_markscheme_{question_id}"] else "Hide Markscheme",
+                key=f"markscheme_toggle_{question_id}",
+        ):
+            st.session_state[f"show_markscheme_{question_id}"] = not st.session_state[f"show_markscheme_{question_id}"]
+            st.rerun()  # Immediately refresh the app
+
+        if st.session_state[f"show_markscheme_{question_id}"]:
+            st.markdown("### Markscheme")
+            st.markdown(styled_markscheme_html, unsafe_allow_html=True)
+
+        # Show Examiner Notes Logic (only if examiner_report_html is not empty)
+        if examiner_report_html and examiner_report_html.strip():
+            if f"show_examiner_notes_{question_id}" not in st.session_state:
+                st.session_state[f"show_examiner_notes_{question_id}"] = False
+
+            if st.button(
+                    "Show Examiner Notes" if not st.session_state[
+                        f"show_examiner_notes_{question_id}"] else "Hide Examiner Notes",
+                    key=f"examiner_notes_toggle_{question_id}",
+            ):
+                st.session_state[f"show_examiner_notes_{question_id}"] = not st.session_state[
+                    f"show_examiner_notes_{question_id}"]
+                st.rerun()  # Immediately refresh the app
+
+            if st.session_state[f"show_examiner_notes_{question_id}"]:
+                st.markdown("### Examiner Notes")
+                st.markdown(examiner_report_html, unsafe_allow_html=True)
+
+        # Add buttons for progress tracking
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            if st.button("Correct", key=f"correct_{question_id}"):
+                update_progress(subject, question_id, "correct", user_id)
+                if QuestionMode == "Fetch":
                     st.session_state[toggle_key] = False
                 else:
                     load_next_question(subject, QuestionMode, user_id)
-
                 st.rerun()
-
-        return
-
-    # -----------------------------------------------------
-    # 2) Normal Flow (for everything not Paper 1A)
-    # -----------------------------------------------------
-
-    # Show/Hide Markscheme logic
-    if f"show_markscheme_{question_id}" not in st.session_state:
-        st.session_state[f"show_markscheme_{question_id}"] = False
-
-    if st.button(
-            "Show Markscheme" if not st.session_state[f"show_markscheme_{question_id}"] else "Hide Markscheme",
-            key=f"markscheme_toggle_{question_id}",
-    ):
-        st.session_state[f"show_markscheme_{question_id}"] = not st.session_state[f"show_markscheme_{question_id}"]
-        st.rerun()
-
-    if st.session_state[f"show_markscheme_{question_id}"]:
-        st.markdown("### Markscheme")
-        st.markdown(styled_markscheme_html, unsafe_allow_html=True)
-
-    # Show Examiner Notes (only if examiner_report_html is not empty)
-    if examiner_report_html and examiner_report_html.strip():
-        if f"show_examiner_notes_{question_id}" not in st.session_state:
-            st.session_state[f"show_examiner_notes_{question_id}"] = False
-
-        if st.button(
-                "Show Examiner Notes" if not st.session_state[f"show_examiner_notes_{question_id}"] else "Hide Examiner Notes",
-                key=f"examiner_notes_toggle_{question_id}",
-        ):
-            st.session_state[f"show_examiner_notes_{question_id}"] = not st.session_state[f"show_examiner_notes_{question_id}"]
-            st.rerun()
-
-        if st.session_state[f"show_examiner_notes_{question_id}"]:
-            st.markdown("### Examiner Notes")
-            st.markdown(examiner_report_html, unsafe_allow_html=True)
-
-    # Progress tracking buttons (correct/partial/incorrect/lack context)
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        if st.button("Correct", key=f"correct_{question_id}"):
-            update_progress(subject, question_id, "correct", user_id)
-            if QuestionMode == "Fetch" and toggle_key is not None:
-                st.session_state[toggle_key] = False
-            else:
-                load_next_question(subject, QuestionMode, user_id)
-            st.rerun()
-    with col2:
-        if st.button("Partially Correct", key=f"partially_correct_{question_id}"):
-            update_progress(subject, question_id, "partially_correct", user_id)
-            if QuestionMode == "Fetch" and toggle_key is not None:
-                st.session_state[toggle_key] = False
-            else:
-                load_next_question(subject, QuestionMode, user_id)
-            st.rerun()
-    with col3:
-        if st.button("Incorrect", key=f"incorrect_{question_id}"):
-            update_progress(subject, question_id, "incorrect", user_id)
-            if QuestionMode == "Fetch" and toggle_key is not None:
-                st.session_state[toggle_key] = False
-            else:
-                load_next_question(subject, QuestionMode, user_id)
-            st.rerun()
-    with col4:
-        if st.button("Lack Context", key=f"lacking_context_{question_id}"):
-            mark_as_lacking_context(subject, question_id, user_id)
-            if QuestionMode == "Fetch" and toggle_key is not None:
-                st.session_state[toggle_key] = False
-            else:
-                load_next_question(subject, QuestionMode, user_id)
-            st.rerun()
+        with col2:
+            if st.button("Partially Correct", key=f"partially_correct_{question_id}"):
+                update_progress(subject, question_id, "partially_correct", user_id)
+                if QuestionMode == "Fetch":
+                    st.session_state[toggle_key] = False
+                else:
+                    load_next_question(subject, QuestionMode, user_id)
+                st.rerun()
+        with col3:
+            if st.button("Incorrect", key=f"incorrect_{question_id}"):
+                update_progress(subject, question_id, "incorrect", user_id)
+                if QuestionMode == "Fetch":
+                    st.session_state[toggle_key] = False
+                else:
+                    load_next_question(subject, QuestionMode, user_id)
+                st.rerun()
+        with col4:
+            if st.button("Lack Context", key=f"lacking_context_{question_id}"):
+                mark_as_lacking_context(subject, question_id, user_id)
+                if QuestionMode == "Fetch":
+                    st.session_state[toggle_key] = False
+                else:
+                    load_next_question(subject, QuestionMode, user_id)
+                st.rerun()
+    else:
+        st.write("No more questions available!")
 
 
 def load_next_question(subject, mode, user_id):
@@ -490,67 +470,64 @@ def debug_syllabus_hierarchy(hierarchy, level=0):
 
 def show_history(subject, user_id):
     """
-    Displays the 30 most recently answered questions for the given user,
-    fetching user_progress rows from questions_game.db,
-    then fetching question details from ChemQuestionsDatabase.db.
+    Displays the 30 most recently answered questions for the given user.
+    - Retrieves progress from Supabase
+    - Retrieves question details from SQLite
     """
 
     # -------------------------------
-    # 1) Fetch user_progress from questions_game.db
+    # 1) Fetch user progress from Supabase
     # -------------------------------
-    game_conn = connect_game_db()
-    game_cursor = game_conn.cursor()
+    response = (
+        supabase.table(subject.lower())
+        .select("question_id, correct_count, partially_correct_count, incorrect_count, updated_at")
+        .eq("user_id", user_id)
+        .order("updated_at", desc=True)
+        .limit(30)
+        .execute()
+    )
 
-    # Suppose we store the last updated time in 'updated_at'
-    # and we only want to show questions where reviewed=1
-    query = f"""
-                SELECT question_id, correct_count, partially_correct_count, incorrect_count, updated_at
-                FROM {subject}
-                WHERE reviewed = 1 AND user_id = ?
-                ORDER BY updated_at DESC
-                LIMIT 30
-            """
-    game_cursor.execute(query, (user_id,))
-
-    progress_rows = game_cursor.fetchall()
-
-    game_conn.close()
+    progress_rows = response.data if response.data else []
 
     if not progress_rows:
         st.write("No recently answered questions to show.")
         return
 
     # -------------------------------
-    # 2) For each question_id, look up question info in ChemQuestionsDatabase.db
+    # 2) Fetch question details from SQLite
     # -------------------------------
     conn = get_db_connection(subject)
     cursor = conn.cursor()
 
     final_results = []
-    for (q_id, correct, partial, incorrect, updated_at) in progress_rows:
-        # Retrieve the question data from the chem DB
-        cursor.execute("""
+    for row in progress_rows:
+        q_id = row["question_id"]
+        cursor.execute(
+            """
             SELECT reference_code, paper
             FROM questions
             WHERE id = ?
-        """, (q_id,))
+            """,
+            (q_id,),
+        )
         question_row = cursor.fetchone()
+
         if question_row:
             reference_code, paper = question_row
             final_results.append({
                 "question_id": q_id,
                 "reference_code": reference_code,
                 "paper": paper,
-                "correct": correct,
-                "partial": partial,
-                "incorrect": incorrect,
-                "updated_at": updated_at
+                "correct": row["correct_count"],
+                "partial": row["partially_correct_count"],
+                "incorrect": row["incorrect_count"],
+                "updated_at": row["updated_at"]
             })
 
     conn.close()
 
     # -------------------------------
-    # 3) Display the combined data
+    # 3) Display Data
     # -------------------------------
     st.write("### Recently Answered Questions")
     for item in final_results:
@@ -559,70 +536,117 @@ def show_history(subject, user_id):
         st.markdown(
             f"- **Question {q_id}** "
             f"(Paper: {item['paper']}, Ref: {item['reference_code']}) "
-            f"| Correct: {item['correct']}, Partial: {item['partial']}, Incorrect: {item['incorrect']} "
-            f"| Last answered on {item['updated_at']}"
+            f"| ✅ Correct: {item['correct']} | ⚠️ Partial: {item['partial']} | ❌ Incorrect: {item['incorrect']} "
+            f"| 🕒 Last answered on {item['updated_at']}"
         )
 
         col1, col2 = st.columns(2)
 
-        # 1) Initialize the boolean in session_state if needed
+        # Show/Hide Question Toggle
         toggle_key = f"show_question_{q_id}"
         if toggle_key not in st.session_state:
             st.session_state[toggle_key] = False
 
-        # 2) The Show/Hide Question button
         with col1:
             btn_label = "Show Question" if not st.session_state[toggle_key] else "Hide Question"
             if st.button(btn_label, key=f"question_toggle_{q_id}"):
-                # Flip the boolean
                 st.session_state[toggle_key] = not st.session_state[toggle_key]
                 st.rerun()
 
-        # 3) The Remove from History button
+        # Remove from History
         with col2:
             if st.button("Remove from History", key=f"remove_{q_id}"):
-                # remove_question_from_progress(q_id, user_id)
-                st.success(f"Removed question {q_id} from your progress.")
+                supabase.table(subject.lower()).delete().eq("user_id", user_id).eq("question_id", q_id).execute()
+                st.success(f"Removed question {q_id} from your history.")
                 st.rerun()
 
-        # 4) Conditionally display the question
+        # Conditionally Display Question
         if st.session_state[toggle_key]:
-            # fetch_question_by_id returns a tuple for display
             question_tuple = fetch_question_by_id(subject, q_id)
             display_question(subject, "Review", question_tuple, user_id, toggle_key)
 
 
 def show_analytics(subject, user_id):
-    conn = connect_game_db()
-    cursor = conn.cursor()
+    """
+    Displays user analytics, including overall performance, accuracy,
+    total attempts, and a leaderboard of all users in the subject.
+    """
 
-    # 1) Count correct, partial, incorrect for the user
-    query = f"""
-                    SELECT SUM(correct_count), SUM(partially_correct_count), SUM(incorrect_count)
-                    FROM {subject}
-                    WHERE user_id = ?
-                """
-    cursor.execute(query, (user_id,))
-    correct_total, partial_total, incorrect_total = cursor.fetchone()
-    correct_total = correct_total or 0
-    partial_total = partial_total or 0
-    incorrect_total = incorrect_total or 0
+    # -------------------------------
+    # 1) Fetch User Performance from Supabase
+    # -------------------------------
+    response = (
+        supabase.table(subject.lower())
+        .select("correct_count, partially_correct_count, incorrect_count")
+        .eq("user_id", user_id)
+        .execute()
+    )
 
-    st.write("### Overall Performance")
-    st.write(f"**Correct:** {correct_total}")
-    st.write(f"**Partially Correct:** {partial_total}")
-    st.write(f"**Incorrect:** {incorrect_total}")
+    records = response.data if response.data else []
 
-    # 2) Possibly a bar chart
-    import pandas as pd
-    data = {
+    # Compute totals
+    correct_total = sum(1 for row in records if row["correct_count"])
+    partial_total = sum(1 for row in records if row["partially_correct_count"])
+    incorrect_total = sum(1 for row in records if row["incorrect_count"])
+    total_attempts = correct_total + partial_total + incorrect_total
+    accuracy = (correct_total / total_attempts * 100) if total_attempts > 0 else 0
+
+    st.write("### 📊 Overall Performance")
+    st.write(f"**✅ Correct:** {correct_total}")
+    st.write(f"**⚠️ Partially Correct:** {partial_total}")
+    st.write(f"**❌ Incorrect:** {incorrect_total}")
+    st.write(f"**Total Questions Attempted:** {total_attempts}")
+    st.write(f"**🎯 Accuracy:** {accuracy:.2f}%")
+
+    # -------------------------------
+    # 2) Generate Performance Bar Chart
+    # -------------------------------
+    df = pd.DataFrame({
         "Status": ["Correct", "Partially Correct", "Incorrect"],
         "Count": [correct_total, partial_total, incorrect_total]
-    }
-    df = pd.DataFrame(data)
-    st.bar_chart(data=df, x="Status", y="Count")
+    })
+    st.bar_chart(df, x="Status", y="Count")
 
-    conn.close()
+    # -------------------------------
+    # 3) Fetch Leaderboard with Usernames from Supabase
+    # -------------------------------
+    leaderboard_response = (
+        supabase.rpc("get_leaderboard", {"subject": subject.lower()})
+        .execute()
+    )
+
+    leaderboard_data = leaderboard_response.data if leaderboard_response.data else []
+
+    if leaderboard_data:
+        leaderboard_df = pd.DataFrame(leaderboard_data)
+        leaderboard_df["Rank"] = leaderboard_df["total_correct"].rank(ascending=False, method="min").astype(int)
+        leaderboard_df = leaderboard_df.sort_values(by="Rank")
+
+        st.write("### 🏆 Leaderboard (Most Correct Answers)")
+        st.dataframe(leaderboard_df, hide_index=True)
+
+    # -------------------------------
+    # 4) Performance Over Time
+    # -------------------------------
+    response = (
+        supabase.table(subject.lower())
+        .select("updated_at, correct_count")
+        .eq("user_id", user_id)
+        .order("updated_at", desc=True)  # ✅ Corrected sorting
+        .execute()
+    )
+
+    trend_data = response.data if response.data else []
+
+    if trend_data:
+        trend_df = pd.DataFrame(trend_data)
+        trend_df["updated_at"] = pd.to_datetime(trend_df["updated_at"])
+        trend_df.set_index("updated_at", inplace=True)
+
+        st.write("### 📈 Performance Over Time")
+        st.line_chart(trend_df["correct_count"])
+
+    st.write("🎯 Keep practicing and track your progress!")
 
 
 if __name__ == "__main__":
