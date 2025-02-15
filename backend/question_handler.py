@@ -78,7 +78,6 @@ def get_random_question_by_paper(subject, paper, user_id):
     cursor = conn.cursor()
 
     reviewed_ids = get_reviewed_question_ids(subject, user_id)
-    raise ValueError(reviewed_ids)
     if reviewed_ids:
         placeholders = ",".join("?" for _ in reviewed_ids)
         query = f"""
