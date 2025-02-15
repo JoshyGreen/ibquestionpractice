@@ -14,8 +14,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def main():
-    st.title("Welcome to the App")
-
     initialize_session()  # Ensure session keys exist
 
     if not is_logged_in():
@@ -33,8 +31,6 @@ def main():
         logout()
 
     # 🔹 Main content after login
-    st.write("🎉 You are logged in!")
-
     user_id = st.session_state['user_id']
     # Initialize session state variables
     if "current_paper_type" not in st.session_state:
