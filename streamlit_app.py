@@ -113,41 +113,44 @@ def main():
                 display_question(subject, QuestionMode, question, user_id)
 
         elif QuestionMode == "By Syllabus":
-
             # Fetch all syllabus links and build hierarchy
             if f"{subject}_syllabus_links" not in st.session_state:
                 st.session_state.syllabus_links = get_all_syllabus_links(subject)
-
+        
             st.session_state.syllabus_hierarchy = build_syllabus_hierarchy(st.session_state.syllabus_links)
-
+        
             # Render the syllabus hierarchy and get the selected syllabus link
             st.markdown("### Syllabus Hierarchy")
-            # Show the "Show All Questions" checkbox
             show_all = st.checkbox("Show All Questions for this Syllabus.")
-
             selected_syllabus = render_syllabus_hierarchy(st.session_state.syllabus_hierarchy)
-
-            # Check if the selected syllabus has changed
+        
+            # If the selected syllabus has changed, update the session and reset the current question
             if selected_syllabus != st.session_state.selected_syllabus:
                 st.session_state.selected_syllabus = selected_syllabus
-                st.session_state.current_syllabus_question = None  # Reset the current question
-
-            # Fetch and display a question for the selected syllabus link
+                st.session_state.current_syllabus_question = None  # Reset to force reloading a question
+        
+            # Only attempt to fetch and display questions if a syllabus has been selected
             if st.session_state.selected_syllabus:
                 if show_all:
-
-                    st.session_state.current_syllabus_question = get_all_questions_by_syllabus(subject,
-                                                                                               st.session_state.selected_syllabus)
+                    # Only load questions if not already fetched
+                    if st.session_state.current_syllabus_question is None:
+                        st.session_state.current_syllabus_question = get_all_questions_by_syllabus(
+                            subject, st.session_state.selected_syllabus
+                        )
                     if st.session_state.current_syllabus_question:
                         for question in st.session_state.current_syllabus_question:
                             display_question(subject, QuestionMode, question, user_id)
-
                 else:
-                    st.session_state.current_syllabus_question = get_questions_by_syllabus(subject,
-                                                                                           st.session_state.selected_syllabus,
-                                                                                           user_id)
+                    # Only fetch a single question if it's not already loaded
+                    if st.session_state.current_syllabus_question is None:
+                        st.session_state.current_syllabus_question = get_questions_by_syllabus(
+                            subject, st.session_state.selected_syllabus, user_id
+                        )
                     if st.session_state.current_syllabus_question:
                         display_question(subject, QuestionMode, st.session_state.current_syllabus_question, user_id)
+
+            
+           
 
         # Progress Bar
         reviewed, total = get_progress(subject, user_id)
