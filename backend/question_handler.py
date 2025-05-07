@@ -47,12 +47,18 @@ def get_random_question(subject, user_id, hl=True):
 
     reviewed_ids = get_reviewed_question_ids(subject, user_id)
 
+    if hl:
+        level = ["HL", "Additional Higher Level"]
+    else:
+        level = ["SL", "Standard Level"]
+
     if reviewed_ids:
         placeholders = ",".join("?" for _ in reviewed_ids)
+        placeholders2 = ",".join("?" for _ in level)
         query = f"""
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
             FROM questions
-            WHERE id NOT IN ({placeholders})
+            WHERE id NOT IN ({placeholders}) AND level IN ({placeholders2})
             ORDER BY RANDOM()
             LIMIT 1
         """
@@ -70,20 +76,26 @@ def get_random_question(subject, user_id, hl=True):
     conn.close()
     return question
 
-def get_random_question_by_paper(subject, paper, user_id):
+def get_random_question_by_paper(subject, paper, user_id, hl=True):
     """
     Fetches a random question by paper, excluding reviewed questions.
     """
     conn = get_db_connection(subject)
     cursor = conn.cursor()
 
+     if hl:
+        level = ["HL", "Additional Higher Level"]
+    else:
+        level = ["SL", "Standard Level"]
+    
     reviewed_ids = get_reviewed_question_ids(subject, user_id)
     if reviewed_ids:
         placeholders = ",".join("?" for _ in reviewed_ids)
+        placeholders2 = ",".join("?" for _ in level)
         query = f"""
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
             FROM questions
-            WHERE paper = ? AND id NOT IN ({placeholders})
+            WHERE paper = ? AND id NOT IN ({placeholders}) AND level IN ({placeholders2})
             ORDER BY RANDOM()
             LIMIT 1
         """
