@@ -62,6 +62,9 @@ def main():
         index=default_idx
     )
 
+    sl_only = st.sidebar.checkbox("Standard Level only", value=False)
+    st.session_state["sl_only"] = sl_only
+
     if "previous_subject" not in st.session_state:
         st.session_state.previous_subject = st.session_state["subject"]
 
@@ -85,7 +88,7 @@ def main():
         if QuestionMode == "Random":
             # Only fetch random question when needed
             if "random_question" not in st.session_state:
-                st.session_state.random_question = get_random_question(st.session_state["subject"], user_id)
+                st.session_state.random_question = get_random_question(st.session_state["subject"], user_id, hl=!(st.session_state["sl_only"]))
             display_question(subject, QuestionMode, st.session_state.random_question, user_id)
         elif QuestionMode == "By Paper":
             # Track the paper type in session state
@@ -106,7 +109,7 @@ def main():
             if paper:
                 # Fetch a new random question if needed
                 if st.session_state.current_paper_question is None:
-                    st.session_state.current_paper_question = get_random_question_by_paper(subject, paper, user_id)
+                    st.session_state.current_paper_question = get_random_question_by_paper(subject, paper, user_id, hl=!(st.session_state["sl_only"]))
 
                 # Display the current question using the centralized function
                 question = st.session_state.current_paper_question
