@@ -46,7 +46,7 @@ def get_random_question(subject, user_id, hl=True):
     cursor = conn.cursor()
 
     reviewed_ids = get_reviewed_question_ids(subject, user_id)
-
+    print(hl)
     if hl:
         level = ["HL", "Additional Higher Level"]
     else:
@@ -54,14 +54,15 @@ def get_random_question(subject, user_id, hl=True):
 
     if reviewed_ids:
         placeholders = ",".join("?" for _ in reviewed_ids)
+        placeholders2= ",".join("?" for _ in level)
         query = f"""
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
             FROM questions
-            WHERE id NOT IN ({placeholders})
+            WHERE id NOT IN ({placeholders}) WHERE level NOT IN ({placeholders})
             ORDER BY RANDOM()
             LIMIT 1
         """
-        cursor.execute(query, reviewed_ids)
+        cursor.execute(query, [reviewed_ids, level])
     else:
         query = """
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
