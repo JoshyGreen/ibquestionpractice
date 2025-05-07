@@ -62,9 +62,6 @@ def main():
         index=default_idx
     )
 
-    sl_only = st.sidebar.checkbox("Standard Level only", value=False)
-    st.session_state["sl_only"] = sl_only
-
     if "previous_subject" not in st.session_state:
         st.session_state.previous_subject = st.session_state["subject"]
 
