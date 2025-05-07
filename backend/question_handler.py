@@ -82,8 +82,7 @@ def get_random_question_by_paper(subject, paper, user_id, hl=True):
     """
     conn = get_db_connection(subject)
     cursor = conn.cursor()
-
-     if hl:
+    if hl:
         level = ["HL", "Additional Higher Level"]
     else:
         level = ["SL", "Standard Level"]
