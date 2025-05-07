@@ -62,7 +62,7 @@ def get_random_question(subject, user_id, hl=True):
             ORDER BY RANDOM()
             LIMIT 1
         """
-        cursor.execute(query, [reviewed_ids, level])
+        cursor.execute(query, [*reviewed_ids, *level])
     else:
         query = """
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
