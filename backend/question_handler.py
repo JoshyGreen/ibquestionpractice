@@ -58,7 +58,7 @@ def get_random_question(subject, user_id, hl=True):
         query = f"""
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
             FROM questions
-            WHERE id NOT IN ({placeholders}) AND level IN ({placeholders2})
+            WHERE id NOT IN ({placeholders})
             ORDER BY RANDOM()
             LIMIT 1
         """
@@ -94,7 +94,7 @@ def get_random_question_by_paper(subject, paper, user_id, hl=True):
         query = f"""
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
             FROM questions
-            WHERE paper = ? AND id NOT IN ({placeholders}) AND level IN ({placeholders2})
+            WHERE paper = ? AND id NOT IN ({placeholders})
             ORDER BY RANDOM()
             LIMIT 1
         """
