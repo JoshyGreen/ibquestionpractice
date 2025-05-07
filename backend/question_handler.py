@@ -58,7 +58,7 @@ def get_random_question(subject, user_id, hl=True):
         query = f"""
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
             FROM questions
-            WHERE id NOT IN ({placeholders}) AND level = SL
+            WHERE id NOT IN ({placeholders}) and level = SL
             ORDER BY RANDOM()
             LIMIT 1
         """
