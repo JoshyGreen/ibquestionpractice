@@ -54,7 +54,6 @@ def get_random_question(subject, user_id, hl=True):
 
     if reviewed_ids:
         placeholders = ",".join("?" for _ in reviewed_ids)
-        placeholders2 = ",".join("?" for _ in level)
         query = f"""
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
             FROM questions
@@ -90,7 +89,6 @@ def get_random_question_by_paper(subject, paper, user_id, hl=True):
     reviewed_ids = get_reviewed_question_ids(subject, user_id)
     if reviewed_ids:
         placeholders = ",".join("?" for _ in reviewed_ids)
-        placeholders2 = ",".join("?" for _ in level)
         query = f"""
             SELECT id, html, paper, reference_code, syllabus_link, maximum_marks, level, markscheme_html, examiner_report_html
             FROM questions
